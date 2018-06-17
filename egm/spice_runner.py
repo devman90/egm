@@ -64,21 +64,24 @@ def parse_spice_output(file_path):
         return data
 
 
-def get_waveform(rstrap, cstrap, lstrap, rdelay, cdelay, cbody):
+def get_waveform(rstrap, cstrap, lstrap, rdelay, cdelay, cbody, resolution=300):
     template_deck = os.path.join(os.path.dirname(__file__), 'assets/esd_gun.sp')
     (_, spice_out) = tempfile.mkstemp()
     replace_map = {"RSTRAP": str(rstrap), "CSTRAP": str(cstrap), "LSTRAP": str(lstrap),
                    "RDELAY": str(rdelay), "CDELAY": str(cdelay), "CBODY": str(cbody), "OUTPUT": spice_out}
     (_, temp_deck) = tempfile.mkstemp()
     manipulate_file(template_deck, temp_deck, replace_map)
-    print(spice_out, temp_deck)
+    #print(spice_out, temp_deck)
 
     configure_json = os.path.join(os.path.dirname(__file__), 'configure.json')
     with open(configure_json, 'r') as f:
         data = json.load(f)
-        print(data['ngspice'])
+        #print(data['ngspice'])
         subprocess.call([data['ngspice'], temp_deck])
-        return parse_spice_output(spice_out)
+        wave = parse_spice_output(spice_out)
+        x_values = np.linspace(wave['x'][0], wave['x'][-1], num=resolution)
+        y_values = np.interp(x_values, wave['x'], wave['y'])
+        return y_values
 
 
 if __name__ == "__main__":
