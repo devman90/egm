@@ -34,13 +34,13 @@ class EsdGunSpiceCreator:
             new_lines.append(line)
         return new_lines
 
-    def create(self, input_data):
-        replace_map = {"RSTRAP": str(input_data['rstrap']),
-                       "CSTRAP": str(input_data['cstrap']),
-                       "LSTRAP": str(input_data['lstrap']),
-                       "RDELAY": str(input_data['rdelay']),
-                       "CDELAY": str(input_data['cdelay']),
-                       "CBODY": str(input_data['cbody']),
+    def create(self, sim_spec):
+        replace_map = {"RSTRAP": str(sim_spec['rstrap']),
+                       "CSTRAP": str(sim_spec['cstrap']),
+                       "LSTRAP": str(sim_spec['lstrap']),
+                       "RDELAY": str(sim_spec['rdelay']),
+                       "CDELAY": str(sim_spec['cdelay']),
+                       "CBODY": str(sim_spec['cbody']),
                        "OUTPUT": self.spice_output}
         with open(self.spice_template, 'r') as rf:
             lines = rf.readlines()
@@ -104,7 +104,7 @@ class WaveformParser:
             return Waveform(data['x'], data['y'])
 
 
-class EsdSimCreator:
+class EsdGunSpecCreator:
     def __init__(self):
         self.range_map = {'rstrap': (50, 550), 'cstrap': (0, 100e-12), 'lstrap': (0, 10e-6),
                           'rdelay': (50, 550), 'cdelay': (0, 60e-12), 'cbody': (0, 600e-12)}
@@ -117,17 +117,17 @@ class EsdSimCreator:
 
     def normalize(self, key, value):
         if key not in self.range_map:
-            print("Invalid key")
+            print("Invalid key:", key)
             return value
         else:
-            return (value - self.range_mape[key][0]) / (self.range_mape[key][1] - self.range_map[key][0])
+            return (value - self.range_map[key][0]) / (self.range_map[key][1] - self.range_map[key][0])
 
     def denormalize(self, key, value):
         if key not in self.range_map:
-            print("Invalid key")
+            print("Invalid key:", key)
             return value
         else:
-            return value * (self.range_mape[key][1] - self.range_map[key][0]) + self.range_mape[key][0]
+            return value * (self.range_map[key][1] - self.range_map[key][0]) + self.range_map[key][0]
 
 
 class EsdSimData:
@@ -142,32 +142,39 @@ class EsdSimData:
         self.output_data = output_data
 
 
-class EsdSimLoader:
+class EsdGunSimLoader:
     @staticmethod
     def load():
-        with open(os.path.join(os.path.dirname(__file__), 'assets/sim_pickle'), 'rb') as f:
-            return pickle.load(f)
+        i = 1
+        sims = []
+        while True:
+            try:
+                with open(os.path.join(os.path.dirname(__file__), 'assets/sim_pickle_' + str(i)), 'rb') as f:
+                    sims += pickle.load(f)
+                    i += 1
+            except Exception as e:
+                print(e)
+                break
+        return sims
+
 
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+    sims = EsdGunSimLoader.load()
+
+    i = len(sims)
     sims = []
-
-    loaded = EsdSimLoader.load()
-    print(len(loaded))
-
     while True:
-        input_data = EsdSimCreator().create_input_data()
+        input_data = EsdGunSpecCreator().create_input_data()
 
         esdGun = EsdGunSpiceCreator()
-        spice, out = esdGun.create(input_data=input_data)
+        spice, out = esdGun.create(sim_spec=input_data)
 
         spiceRunner = SpiceRunner()
         spiceRunner.start(spice)
 
         wave = WaveformParser.parse(out)
-        plt.plot(wave.sampled(10))
-        plt.show()
         output_data = wave
 
         sim = EsdSimData()
@@ -175,9 +182,12 @@ if __name__ == "__main__":
         sim.set_output_data(output_data)
 
         sims.append(sim)
+        i += 1
 
-        if len(sims) > 10:
+        print(i)
+        if i % 1000 == 0:
+            with open(os.path.join(os.path.dirname(__file__), 'assets/sim_pickle_' + str(i // 1000)), 'wb') as f:
+                pickle.dump(sims, f)
+                sims.clear()
+        if i >= 100000:
             break
-    with open(os.path.join(os.path.dirname(__file__), 'assets/sim_pickle'), 'wb') as f:
-        pickle.dump(sims, f)
-
