@@ -1,3 +1,4 @@
+*************
 c1 1 0 CSTRAP
 r1 2 1 RSTRAP
 l1 2 0 LSTRAP
