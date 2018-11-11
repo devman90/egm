@@ -61,6 +61,11 @@ class Waveform:
         sampled_y = np.interp(x_values, self.x_values, self.y_values)
         return sampled_y
 
+    def interp(self, sample):
+        x_values = np.linspace(self.x_values[0], self.x_values[-1], sample)
+        self.y_values = np.interp(x_values, self.x_values, self.y_values)
+        self.x_values = x_values
+
 
 class WaveformParser:
     @staticmethod
@@ -144,19 +149,24 @@ class EsdSimData:
 
 class EsdGunSimLoader:
     @staticmethod
-    def load():
+    def load(datanum=0, sample=0):
         i = 1
         sims = []
         while True:
             try:
                 with open(os.path.join(os.path.dirname(__file__), 'assets/sim_pickle_' + str(i)), 'rb') as f:
-                    sims += pickle.load(f)
+                    new_sims = pickle.load(f)
+                    if sample != 0:
+                        for sim in new_sims:
+                            sim.output_data.interp(sample)
+                    sims += new_sims
+                    if datanum != 0 and len(sims) >= datanum:
+                        return sims[:datanum]
                     i += 1
             except Exception as e:
                 print(e)
                 break
         return sims
-
 
 
 if __name__ == "__main__":
@@ -191,3 +201,5 @@ if __name__ == "__main__":
                 sims.clear()
         if i >= 100000:
             break
+
+
